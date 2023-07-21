@@ -119,6 +119,8 @@ python server.py [HOST [PORT]]
 - E to cycle through the block types.
 - Tab to toggle between walking and flying.
 - ZXCVBN to move in exact directions along the XYZ axes.
+- Period (.) To raise the height of the camera
+- Comma (,) To lower the height of the camera
 - Left shift to zoom.
 - F to show the scene in orthographic mode.
 - O to observe players in the main view.
@@ -130,6 +132,10 @@ python server.py [HOST [PORT]]
 - Enter emulates mouse click.
 
 ### Chat Commands
+
+    /mouse [f]
+
+Set the mouse sensitivity. Default value is 0.0025. Valid range from 0.0 (exclusive) to 1.0 (inclusive). 
 
     /goto [NAME]
 
@@ -166,6 +172,12 @@ Teleport to the specified chunk.
     /spawn
 
 Teleport back to the spawn point.
+
+### More Chat Commands (FOR 3l1t3 h4ck3rs ONLY!)
+
+    /flyspeed [N]
+
+Sets flying speed. Valid speeds 1 - 50 
 
 ### Screenshot
 
