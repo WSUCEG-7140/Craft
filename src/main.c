@@ -151,10 +151,13 @@ typedef struct {
     Block block1;
     Block copy0;
     Block copy1;
+    GLuint menu_buffer; // menu buffer needs to persist in the window object? 
+    int p_height; // player height
 } Model;
 
 static Model model;
 static Model *g = &model;
+int TOGGLE_MENU = 0;
 
 int chunked(float x) {
     return floorf(roundf(x) / CHUNK_SIZE);
@@ -293,6 +296,17 @@ GLuint gen_text_buffer(float x, float y, float n, char *text) {
     return gen_faces(4, length, data);
 }
 
+GLuint gen_menu_buffer(){
+    int x = g->width /2;
+    int y = g->height  /2;
+    int p = 10 * g->scale;
+    float data[] = {
+        x, y - p, x, y + p,
+        x - p, y, x + p, y
+    };
+    return gen_buffer(sizeof(data),data);
+}
+
 void draw_triangles_3d_ao(Attrib *attrib, GLuint buffer, int count) {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(attrib->position);
@@ -406,6 +420,10 @@ void draw_plant(Attrib *attrib, GLuint buffer) {
 
 void draw_player(Attrib *attrib, Player *player) {
     draw_cube(attrib, player->buffer);
+}
+
+void draw_menu(Attrib *attrib, GLuint buffer){
+    draw_triangles_3d_ao(attrib, buffer, 16);
 }
 
 Player *find_player(int id) {
@@ -1265,6 +1283,7 @@ void delete_all_chunks() {
     g->chunk_count = 0;
 }
 
+
 void check_workers() {
     for (int i = 0; i < WORKERS; i++) {
         Worker *worker = g->workers + i;
@@ -1801,6 +1820,15 @@ void render_text(
     del_buffer(buffer);
 }
 
+void render_menu(Attrib *attrib){
+    float matrix[16];
+    set_matrix_item(matrix, g->width, g->height, g->scale);
+    glUseProgram(attrib->program);
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    GLuint buffer = gen_menu_buffer();
+    draw_menu(attrib, buffer);
+    del_buffer(buffer);
+}
 void add_message(const char *text) {
     printf("%s\n", text);
     snprintf(
@@ -2200,6 +2228,11 @@ void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
     }
+    if (key == CRAFT_KEY_MENU){
+        TOGGLE_MENU = !TOGGLE_MENU;
+        printf("p was pressed");
+    }
+
     if (key == GLFW_KEY_ENTER) {
         if (g->typing) {
             if (mods & GLFW_MOD_SHIFT) {
@@ -2463,8 +2496,8 @@ void handle_movement(double dt) {
         }
         s->x += vx;
         s->y += vy + dy * ut;
-        s->z += vz;
-        if (collide(2, &s->x, &s->y, &s->z)) {
+        s->z += vz; 		// collide - height is the block height or character height 
+          if (collide(g->p_height, &s->x, &s->y, &s->z)) {
             dy = 0;
         }
     }
@@ -2657,11 +2690,19 @@ int main(int argc, char **argv) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/sign.png");
 
+    GLuint game_menu;
+    glGenTextures(1, &game_menu);
+    glBindTexture(GL_TEXTURE_2D, game_menu);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    load_png_texture("textures/menu.png");
+
     // LOAD SHADERS //
     Attrib block_attrib = {0};
     Attrib line_attrib = {0};
     Attrib text_attrib = {0};
     Attrib sky_attrib = {0};
+    Attrib game_menu_attrib = {0};
     GLuint program;
 
     program = load_program(
@@ -2703,6 +2744,13 @@ int main(int argc, char **argv) {
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
+
+    program = load_program(
+        "shaders/game_menu_vertex.glsl", "shaders/game_menu_fragment.glsl");
+    game_menu_attrib.program = program;
+    game_menu_attrib.position = glGetAttribLocation(program, "position");
+    game_menu_attrib.normal = glGetAttribLocation(program, "normal");
+    game_menu_attrib.matrix = glGetUniformLocation(program, "matrix");
 
     // CHECK COMMAND LINE ARGUMENTS //
     if (argc == 2 || argc == 3) {
@@ -2950,6 +2998,10 @@ int main(int argc, char **argv) {
                 g->mode_changed = 0;
                 break;
             }
+        }
+        // RENDER GAME MENU //
+        if(TOGGLE_MENU){
+            render_menu(&game_menu_attrib);
         }
 
         // SHUTDOWN //
