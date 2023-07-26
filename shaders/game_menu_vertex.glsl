@@ -1,5 +1,13 @@
 #version 120
 
+uniform mat4 matrix;
+uniform vec3 camera;
+
+attribute vec4 position;
+attribute vec3 normal;
+attribute vec4 uv;
+
+
 void main() {
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x+10.0, position.y, position.z+5.0, 1.0);
+  gl_Position = matrix * position;
 }

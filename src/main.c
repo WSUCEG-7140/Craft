@@ -300,7 +300,11 @@ GLuint gen_text_buffer(float x, float y, float n, char *text) {
     return gen_faces(4, length, data);
 }
 
+/** 
+ * buffer for game menu data
+*/
 GLuint gen_menu_buffer(){
+    printf("inside gen_menu_buffer");
     int x = g->width /2;
     int y = g->height  /2;
     int p = 10 * g->scale;
@@ -426,7 +430,11 @@ void draw_player(Attrib *attrib, Player *player) {
     draw_cube(attrib, player->buffer);
 }
 
+/** 
+ * method to draw the game menu
+*/
 void draw_menu(Attrib *attrib, GLuint buffer){
+    printf("in draw_menu");
     draw_triangles_3d_ao(attrib, buffer, 16);
 }
 
@@ -1824,7 +1832,12 @@ void render_text(
     del_buffer(buffer);
 }
 
+/** 
+ * method to render the game menu
+ * issue19 https://github.com/WSUCEG-7140/Craft/issues/19
+*/
 void render_menu(Attrib *attrib){
+    printf("inside render_menu");
     float matrix[16];
     set_matrix_item(matrix, g->width, g->height, g->scale);
     glUseProgram(attrib->program);
@@ -2163,6 +2176,15 @@ void parse_command(const char *buffer, int forward) {
             add_message("Mouse sensitivity must be between 0.0 and 1.0");
         }
     }
+    else if (sscanf(buffer, "/pause %f", &sensitivity) == 1) {
+        //Toggle game menu using a console command 
+        // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
+        if(TOGGLE_MENU == 0){
+            TOGGLE_MENU == 1;
+        } else {
+            TOGGLE_MENU == 0;
+        }
+    }
     else if (sscanf(buffer, "/view %d", &radius) == 1) {
         if (radius >= 1 && radius <= 24) {
             g->create_radius = radius;
@@ -2309,9 +2331,16 @@ void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
     }
+    // toggle the game menu on key press
+    // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
     if (key == CRAFT_KEY_MENU){
-        TOGGLE_MENU = !TOGGLE_MENU;
         printf("p was pressed");
+        if(TOGGLE_MENU == 0){
+            TOGGLE_MENU == 1;
+        }else{
+            TOGGLE_MENU == 0;
+        }
+    
     }
 
     if (key == GLFW_KEY_ENTER) {
@@ -2787,6 +2816,8 @@ int main(int argc, char **argv) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/sign.png");
 
+    // set up for game menu textures to be drawn when needed
+    // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
     GLuint game_menu;
     glGenTextures(1, &game_menu);
     glBindTexture(GL_TEXTURE_2D, game_menu);
@@ -2842,6 +2873,8 @@ int main(int argc, char **argv) {
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
 
+    //set up for game menu shaders to be used when needed
+    // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
     program = load_program(
         "shaders/game_menu_vertex.glsl", "shaders/game_menu_fragment.glsl");
     game_menu_attrib.program = program;
@@ -3097,7 +3130,10 @@ int main(int argc, char **argv) {
             }
         }
         // RENDER GAME MENU //
+        // when pause button is pressed, toggle menu is set to true, rendering the game menu
+        // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
         if(TOGGLE_MENU){
+            printf("main loop MENU toggled");
             render_menu(&game_menu_attrib);
         }
 
