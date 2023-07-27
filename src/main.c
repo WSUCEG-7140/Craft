@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdbool.h>
 #include "auth.h"
 #include "client.h"
 #include "config.h"
@@ -39,7 +40,7 @@
 #define WORKER_BUSY 1
 #define WORKER_DONE 2
 
-#define PLAYER_HEIGHT 2
+#define PLAYER_HEIGHT 2  /// Constant representing the height of a player in the game
 
 typedef struct {
     Map map;
@@ -156,7 +157,10 @@ typedef struct {
     Block copy0;
     Block copy1;
     GLuint menu_buffer; // menu buffer needs to persist in the window object? 
-    int p_height; // player height
+    int p_height; /// Height of the player in the game world
+    long timeout; /// Timeout value used for the timer feature for issue #17
+    bool hasTimeout;  /// Flag indicating if the timer feature has been set
+    time_t start; /// Time value representing the start time of the timer feature
 } Model;
 
 static Model model;
@@ -315,6 +319,15 @@ GLuint gen_menu_buffer(){
     return gen_buffer(sizeof(data),data);
 }
 
+GLuint gen_plane_buffer(float x, float y, float n) {
+    int length = 100;
+    GLfloat *data = malloc_faces(4, length);     
+    return gen_faces(4, length, data);
+    /// The function returns the buffer object identifier (GLuint) created by 'gen_faces' function.
+    ///'4': This represents the number of vertices per face of the plane (a quad).
+    ///'length': The number of vertices calculated earlier (100 in this case).
+    ///'data': The pointer to the vertex data of the plane.
+}
 void draw_triangles_3d_ao(Attrib *attrib, GLuint buffer, int count) {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(attrib->position);
@@ -849,14 +862,14 @@ int _gen_sign_buffer(
 void gen_sign_buffer(Chunk *chunk) {
     SignList *signs = &chunk->signs;
 
-    // first pass - count characters
+    /// first pass - count characters
     int max_faces = 0;
     for (int i = 0; i < signs->size; i++) {
         Sign *e = signs->data + i;
         max_faces += strlen(e->text);
     }
 
-    // second pass - generate geometry
+    /// second pass - generate geometry
     GLfloat *data = malloc_faces(5, max_faces);
     int faces = 0;
     for (int i = 0; i < signs->size; i++) {
@@ -994,7 +1007,7 @@ void compute_chunk(WorkerItem *item) {
     int oy = -1;
     int oz = item->q * CHUNK_SIZE - CHUNK_SIZE - 1;
 
-    // check for lights
+    /// check for lights
     int has_light = 0;
     if (SHOW_LIGHTS) {
         for (int a = 0; a < 3; a++) {
@@ -1007,7 +1020,7 @@ void compute_chunk(WorkerItem *item) {
         }
     }
 
-    // populate opaque array
+    /// populate opaque array
     for (int a = 0; a < 3; a++) {
         for (int b = 0; b < 3; b++) {
             Map *map = item->block_maps[a][b];
@@ -1019,14 +1032,14 @@ void compute_chunk(WorkerItem *item) {
                 int y = ey - oy;
                 int z = ez - oz;
                 int w = ew;
-                // TODO: this should be unnecessary
+                /// TODO: this should be unnecessary
                 if (x < 0 || y < 0 || z < 0) {
                     continue;
                 }
                 if (x >= XZ_SIZE || y >= Y_SIZE || z >= XZ_SIZE) {
                     continue;
                 }
-                // END TODO
+                /// END TODO
                 opaque[XYZ(x, y, z)] = !is_transparent(w);
                 if (opaque[XYZ(x, y, z)]) {
                     highest[XZ(x, z)] = MAX(highest[XZ(x, z)], y);
@@ -1035,7 +1048,7 @@ void compute_chunk(WorkerItem *item) {
         }
     }
 
-    // flood fill light intensities
+    /// flood fill light intensities
     if (has_light) {
         for (int a = 0; a < 3; a++) {
             for (int b = 0; b < 3; b++) {
@@ -1055,7 +1068,7 @@ void compute_chunk(WorkerItem *item) {
 
     Map *map = item->block_maps[1][1];
 
-    // count exposed faces
+    /// count exposed faces
     int miny = 256;
     int maxy = 0;
     int faces = 0;
@@ -1084,7 +1097,7 @@ void compute_chunk(WorkerItem *item) {
         faces += total;
     } END_MAP_FOR_EACH;
 
-    // generate geometry
+    /// generate geometry
     GLfloat *data = malloc_faces(10, faces);
     int offset = 0;
     MAP_FOR_EACH(map, ex, ey, ez, ew) {
@@ -1816,6 +1829,46 @@ void render_item(Attrib *attrib) {
     }
 }
 
+void render_binoculars(Attrib *attrib) ///Creates Binoculars
+/// This function is used to render a binoculars effect using OpenGL.
+/// It takes a pointer to an 'Attrib' structure as an argument, which holds
+/// various attributes and settings related to OpenGL rendering.
+{
+    float matrix[16];
+    /// Declare an array 'matrix' of size 16 to store a 4x4 transformation matrix.
+    /// This matrix will be used to perform transformations in the OpenGL rendering pipeline.
+    set_matrix_item(matrix, g->width, g->height, g->scale*20);
+    /// Set the values of the 'matrix' based on the width, height, and scale of the binoculars.
+    /// The 'set_matrix_item' function populates the 'matrix' with appropriate values.
+    
+    glUseProgram(attrib->program);
+    /// Activate the OpenGL shader program specified in the 'program' attribute of the 'attrib' structure.
+    /// This prepares the GPU to execute the shaders required for the rendering.
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    /// Set the value of the matrix uniform variable in the shader program with the 'matrix' data.
+    /// The matrix is passed as a 4x4 floating-point matrix (GL_FALSE indicates no transpose).
+    glUniform3f(attrib->camera, 0, 0, 5);
+    /// Set the value of the 'camera' uniform variable in the shader program to (0, 0, 5).
+    /// This defines the position of the camera used in the rendering.
+    glUniform1i(attrib->sampler, 0);
+    /// Set the value of the 'sampler' uniform variable in the shader program to 0.
+    /// This indicates that the shader will use texture unit 0 for texturing.
+    glUniform1f(attrib->timer, time_of_day());
+    /// Set the value of the 'timer' uniform variable in the shader program to the current in-game time.
+    /// The 'time_of_day()' function returns the current time in the game.
+    int w = 23; 
+    /// Declare an integer variable 'w' and set it to 23. This variable represents the width value.
+    GLuint buffer = gen_plant_buffer(-0.9, -.4, 0, 0.5, w);
+    /// Generate a buffer object for the binocular model based on the provided parameters.
+    /// The 'gen_plant_buffer' function generates the vertex data for the binocular and returns a buffer object.
+        draw_plant(attrib, buffer);
+        /// Render the binocular model using the 'draw_plant' function.
+        /// The 'attrib' argument provides the necessary attributes and settings for the rendering.
+
+        del_buffer(buffer);
+        /// Delete the buffer object as it is no longer needed. This is done to free up GPU memory.
+        /// The 'del_buffer' function takes the buffer object identifier as an argument and deletes it.
+}
 void render_text(
     Attrib *attrib, int justify, float x, float y, float n, char *text)
 {
@@ -2064,7 +2117,7 @@ void tree(Block *block) {
 }
 
 void parse_command(const char *buffer, int forward) {
-    char help_target[128] = {0}; //optional arg for the help command to get specific help
+    char help_target[128] = {0}; ///optional arg for the help command to get specific help
     char username[128] = {0};
     char token[128] = {0};
     char server_addr[MAX_ADDR_LENGTH];
@@ -2077,8 +2130,8 @@ void parse_command(const char *buffer, int forward) {
         add_message("Successfully imported identity token!");
         login();
     }
-    else if (sscanf(buffer, "/help %128s", help_target) == 1) {  //this handles a help command with optional target
-        //basic if statement handling for each supported command
+    else if (sscanf(buffer, "/help %128s", help_target) == 1) {  ///this handles a help command with optional target
+        ///basic if statement handling for each supported command
         if (strcmp(help_target, "goto") == 0) {
             add_message("Help: /goto [NAME]");
             add_message("Teleport to another user.");
@@ -2127,11 +2180,11 @@ void parse_command(const char *buffer, int forward) {
             add_message("Help: /mouse [F]");
             add_message("Set the mouse sensitivity. Default value is 0.0025. Valid range from 0.0 (exclusive) to 1.0 (inclusive).");
         }
-        else { //make sure we handle unincluded commands
+        else { ///make sure we handle unincluded commands
              add_message("That command does not have a help page");
         }
     }
-    else if (strcmp(buffer, "/help") == 0) { //non-overloaded function handler
+    else if (strcmp(buffer, "/help") == 0) { ///non-overloaded function handler
         add_message("Type \"t\" to chat. Type \"/\" to type commands:");
         add_message("/goto [NAME], /help [TOPIC], /list, /login NAME, /logout, /offline [FILE],");
         add_message("/online HOST [PORT], /pq P Q, /spawn, /view [N], /flyspeed [N], /mouse [F]");
@@ -2195,9 +2248,9 @@ void parse_command(const char *buffer, int forward) {
             add_message("Viewing distance must be between 1 and 24.");
         }
     }
-    else if (sscanf(buffer, "/flyspeed %d", &speed) == 1) { //handler for setter command
-        if (speed >= 1 && speed <= 50) { //conform to valid range
-            g->flying_sprint_speed = speed; //update player value
+    else if (sscanf(buffer, "/flyspeed %d", &speed) == 1) { ///handler for setter command
+        if (speed >= 1 && speed <= 50) { ///conform to valid range
+            g->flying_sprint_speed = speed; ///update player value
         }
         else {
             add_message("Flying speed must be between 1 and 50.");
@@ -2253,6 +2306,20 @@ void parse_command(const char *buffer, int forward) {
     }
     else if (sscanf(buffer, "/cylinder %d", &radius) == 1) {
         cylinder(&g->block0, &g->block1, radius, 0);
+    }
+    /// Check if the command is "/addtime" followed by an integer count value.
+    else if (sscanf(buffer, "/addtime %d", &count) == 1) {
+         /// Set a timeout value with the desired duration in seconds for your gameplay session
+        /// This is used for the timer functionality.
+        g->start = time(NULL);
+        /// Get the current time in seconds using the 'time' function from the standard library.
+         /// Set the 'hasTimeout' flag to true, indicating that the timer has been set.
+        /// This flag is used to manage the timer feature.
+        g->hasTimeout = true; ///timer feature
+          /// Add the specified 'count' value to the 'timeout' variable.
+          /// 'count' represents the number of seconds to be added to the timeout.
+        g->timeout += count;
+
     }
     else if (forward) {
         client_talk(buffer);
@@ -2416,16 +2483,29 @@ void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
         }
     }
 
-    if (key == GLFW_KEY_COMMA) //Lower Height
+    if (key == GLFW_KEY_COMMA) 
+    ///This function is used to lower the height of the camera
+    /// Check if the key pressed is the comma key (',').
     {
-        if (g->p_height > 2)        
+        /// Check if the player's height (p_height) is greater than 2.
+        /// This ensures that the camera height is not reduced below a minimum limit. Anything lower than 2 and the player gets stuck in the blocks.
+        if (g->p_height > 2)
+        /// Decrease the player's height (camera height) by 1 unit
             g->p_height -= 1;            
     }
 
-    if (key == GLFW_KEY_PERIOD) //Raise Height
+    if (key == GLFW_KEY_PERIOD) 
+    /// Check if the key pressed is the period key ('.').
+    /// This function is used to raise the height of the camera.
     {
+        /// Get a reference to the player's state (position and orientation) in the game (State struct).
+        ///Here we access the first player's state.
         State *s = &g->players->state;
+        /// Increase the y-coordinate (vertical height) of the player's state by 1 unit.
+        /// This moves the player upward in the game.
         s->y += 1;
+        /// Increase the player's height (camera height) by 1 unit.
+        /// The player's height affects the camera position relative to the player's position.
         g->p_height += 1;        
     }
 }
@@ -2540,13 +2620,13 @@ void handle_mouse_input() {
     if (exclusive && (px || py)) {
         double mx, my;
         glfwGetCursorPos(g->window, &mx, &my);
-        //player defined value replaces the previous const scalar 
-        s->rx += (mx - px) * g->mouse_sensitivity; //update mouse x position, smoothed by mouse sensitivity
+        ///player defined value replaces the previous const scalar 
+        s->rx += (mx - px) * g->mouse_sensitivity; ///update mouse x position, smoothed by mouse sensitivity
         if (INVERT_MOUSE) {
-            s->ry += (my - py) * g->mouse_sensitivity; //update mouse y position, smoothed by mouse sensitivity
+            s->ry += (my - py) * g->mouse_sensitivity; ///update mouse y position, smoothed by mouse sensitivity
         }
         else {
-            s->ry -= (my - py) * g->mouse_sensitivity; //update mouse y position, smoothed by mouse sensitivity
+            s->ry -= (my - py) * g->mouse_sensitivity; ///update mouse y position, smoothed by mouse sensitivity
         }
         if (s->rx < 0) {
             s->rx += RADIANS(360);
@@ -2569,11 +2649,14 @@ void handle_movement(double dt) {
     State *s = &g->players->state;
     int sz = 0;
     int sx = 0;
-    int isRunning = 0;
+    int isRunning = 0; /// Variable to store the running state, initially set to 0 (not running).
     if (!g->typing) {
         float m = dt * 1.0;
         g->ortho = glfwGetKey(g->window, CRAFT_KEY_ORTHO) ? 64 : 0;
         g->fov = glfwGetKey(g->window, CRAFT_KEY_ZOOM) ? 15 : 65;
+
+    /// Check if both the "forward" key and the "run" key are pressed simultaneously.
+    /// If both keys are pressed, set "isRunning" to 1 to indicate that the player is running.
         if (glfwGetKey(g->window, CRAFT_KEY_FORWARD)) {
             if(glfwGetKey(g->window, CRAFT_KEY_RUN)) isRunning = 1;
             sz--;
@@ -2598,7 +2681,13 @@ void handle_movement(double dt) {
             }
         }
     }
-    float speed = g->flying ? g->flying_sprint_speed : 5; // flying gets modifiable speed
+    float speed = g->flying ? g->flying_sprint_speed : 5; /// flying gets modifiable speed
+
+    /// Check if the player is currently running (isRunning is true).
+    /// If the player is running, increase their speed by 50% (multiply speed by 1.5).
+    /// This line presumably enhances the player's movement speed when running.
+    /// The value of "speed" should be a variable that controls the player's movement speed in the game.
+    /// The multiplication by 1.5 boosts the speed to create a faster movement effect while running.
     if(isRunning) speed*=1.5;
     int estimate = roundf(sqrtf(
         powf(vx * speed, 2) +
@@ -2619,12 +2708,20 @@ void handle_movement(double dt) {
         }
         s->x += vx;
         s->y += vy + dy * ut;
-        s->z += vz; 		// collide - height is the block height or character height 
+        s->z += vz; 		/// collide - height is the block height or character height 
+        /// Check if a collision occurs at the current player's position (x, y, z) and camera height (p_height).
+        /// The function 'collide' is used to detect collisions with the game environment.
+        /// 'collide' is a function that takes the player's height (p_height) and position (x, y, z) as arguments.
           if (collide(g->p_height, &s->x, &s->y, &s->z)) {
+            /// If a collision is detected, set the vertical velocity component (dy) to 0.
+            /// This effectively prevents the player from moving vertically in the upward or downward direction.
+            /// In other words, the player's position is clamped to prevent them from moving through solid objects or terrain.
             dy = 0;
         }
     }
     if (s->y < 0) {
+            /// Calculate the new y-coordinate for the player by adding the player's height (p_height) to the height of the highest block at (x, z).
+            /// This adjustment prevents the player from falling through the ground and places them on the surface of the highest block.
         s->y = highest_block(s->x, s->z) + g->p_height;
     }
 }
@@ -2672,7 +2769,7 @@ void parse_buffer(char *buffer) {
                 player->id = pid;
                 player->buffer = 0;
                 snprintf(player->name, MAX_NAME_LENGTH, "player%d", pid);
-                update_player(player, px, py, pz, prx, pry, 1); // twice
+                update_player(player, px, py, pz, prx, pry, 1); /// twice
             }
             if (player) {
                 update_player(player, px, py, pz, prx, pry, 1);
@@ -2734,9 +2831,9 @@ void reset_model() {
     g->observe1 = 0;
     g->observe2 = 0;
     g->flying = 0;
-    g->flying_sprint_speed = 20; //player gets the old standard flyspeed upon startup
+    g->flying_sprint_speed = 20; ///player gets the old standard flyspeed upon startup
     g->item_index = 0;
-    g->mouse_sensitivity = 0.0025; //player gets the old standard mouse sensitivity upon startup
+    g->mouse_sensitivity = 0.0025; ///player gets the old standard mouse sensitivity upon startup
     memset(g->typing_buffer, 0, sizeof(char) * MAX_TEXT_LENGTH);
     g->typing = 0;
     memset(g->messages, 0, sizeof(char) * MAX_MESSAGES * MAX_TEXT_LENGTH);
@@ -2744,16 +2841,19 @@ void reset_model() {
     g->day_length = DAY_LENGTH;
     glfwSetTime(g->day_length / 3.0);
     g->time_changed = 1;
+    /// Set the player's height (camera height) to 2 units.
      g->p_height = 2;
+     /// Set the timeout value to zero, indicating that no timer is currently set.
+    g->timeout = 0;
 }
 
 int main(int argc, char **argv) {
-    // INITIALIZATION //
+    /// INITIALIZATION ///
     curl_global_init(CURL_GLOBAL_DEFAULT);
     srand(time(NULL));
     rand();
 
-    // WINDOW INITIALIZATION //
+    /// WINDOW INITIALIZATION ///
     if (!glfwInit()) {
         return -1;
     }
@@ -2780,14 +2880,14 @@ int main(int argc, char **argv) {
     glLogicOp(GL_INVERT);
     glClearColor(0, 0, 0, 1);
 
-    // LOAD TEXTURES //
+    /// LOAD TEXTURES ///
     GLuint texture;
     glGenTextures(1, &texture);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    //updated to new texture file that was edited to include a new block texture
+    ///updated to new texture file that was edited to include a new block texture
     load_png_texture("textures/texture2.png");
 
     GLuint font;
@@ -2825,10 +2925,11 @@ int main(int argc, char **argv) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/menu.png");
 
-    // LOAD SHADERS //
+    /// LOAD SHADERS ///
     Attrib block_attrib = {0};
     Attrib line_attrib = {0};
     Attrib text_attrib = {0};
+    Attrib binoculars_attrib = {0}; /// Declare an 'Attrib' structure variable 'binoculars_attrib' and initialize it with all members set to 0.
     Attrib sky_attrib = {0};
     Attrib game_menu_attrib = {0};
     GLuint program;
@@ -2864,6 +2965,21 @@ int main(int argc, char **argv) {
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
 
     program = load_program(
+        "shaders/block_vertex.glsl", "shaders/block_fragment.glsl");        
+    binoculars_attrib.program = program;
+    binoculars_attrib.position = glGetAttribLocation(program, "position");
+    binoculars_attrib.normal = glGetAttribLocation(program, "normal");
+    binoculars_attrib.uv = glGetAttribLocation(program, "uv");
+    binoculars_attrib.matrix = glGetUniformLocation(program, "matrix");
+    binoculars_attrib.sampler = glGetUniformLocation(program, "sampler");
+    binoculars_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
+    binoculars_attrib.extra2 = glGetUniformLocation(program, "daylight");
+    binoculars_attrib.extra3 = glGetUniformLocation(program, "fog_distance");
+    binoculars_attrib.extra4 = glGetUniformLocation(program, "ortho");
+    binoculars_attrib.camera = glGetUniformLocation(program, "camera");
+    binoculars_attrib.timer = glGetUniformLocation(program, "timer");
+
+    program = load_program(
         "shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
     sky_attrib.program = program;
     sky_attrib.position = glGetAttribLocation(program, "position");
@@ -2882,7 +2998,7 @@ int main(int argc, char **argv) {
     game_menu_attrib.normal = glGetAttribLocation(program, "normal");
     game_menu_attrib.matrix = glGetUniformLocation(program, "matrix");
 
-    // CHECK COMMAND LINE ARGUMENTS //
+    /// CHECK COMMAND LINE ARGUMENTS ///
     if (argc == 2 || argc == 3) {
         g->mode = MODE_ONLINE;
         strncpy(g->server_addr, argv[1], MAX_ADDR_LENGTH);
@@ -2900,7 +3016,7 @@ int main(int argc, char **argv) {
     g->delete_radius = DELETE_CHUNK_RADIUS;
     g->sign_radius = RENDER_SIGN_RADIUS;
 
-    // INITIALIZE WORKER THREADS
+    /// INITIALIZE WORKER THREADS
     for (int i = 0; i < WORKERS; i++) {
         Worker *worker = g->workers + i;
         worker->index = i;
@@ -2910,22 +3026,22 @@ int main(int argc, char **argv) {
         thrd_create(&worker->thrd, worker_run, worker);
     }
 
-    // OUTER LOOP //
+    /// OUTER LOOP ///
     int running = 1;
     while (running) {
-        // DATABASE INITIALIZATION //
+        /// DATABASE INITIALIZATION ///
         if (g->mode == MODE_OFFLINE || USE_CACHE) {
             db_enable();
             if (db_init(g->db_path)) {
                 return -1;
             }
             if (g->mode == MODE_ONLINE) {
-                // TODO: support proper caching of signs (handle deletions)
+                /// TODO: support proper caching of signs (handle deletions)
                 db_delete_all_signs();
             }
         }
 
-        // CLIENT INITIALIZATION //
+        /// CLIENT INITIALIZATION ///
         if (g->mode == MODE_ONLINE) {
             client_enable();
             client_connect(g->server_addr, g->server_port);
@@ -2934,7 +3050,7 @@ int main(int argc, char **argv) {
             login();
         }
 
-        // LOCAL VARIABLES //
+        /// LOCAL VARIABLES ///
         reset_model();
         FPS fps = {0, 0, 0};
         double last_commit = glfwGetTime();
@@ -2948,22 +3064,22 @@ int main(int argc, char **argv) {
         me->buffer = 0;
         g->player_count = 1;
 
-        // LOAD STATE FROM DATABASE //
+        /// LOAD STATE FROM DATABASE ///
         int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
         force_chunks(me);
         if (!loaded) {
              s->y = highest_block(s->x, s->z);
         }
 
-        // BEGIN MAIN LOOP //
+        /// BEGIN MAIN LOOP ///
         double previous = glfwGetTime();
         while (1) {
-            // WINDOW SIZE AND SCALE //
+            /// WINDOW SIZE AND SCALE ///
             g->scale = get_scale_factor();
             glfwGetFramebufferSize(g->window, &g->width, &g->height);
             glViewport(0, 0, g->width, g->height);
 
-            // FRAME RATE //
+            /// FRAME RATE ///
             if (g->time_changed) {
                 g->time_changed = 0;
                 last_commit = glfwGetTime();
@@ -2977,32 +3093,32 @@ int main(int argc, char **argv) {
             dt = MAX(dt, 0.0);
             previous = now;
 
-            // HANDLE MOUSE INPUT //
+            /// HANDLE MOUSE INPUT ///
             handle_mouse_input();
 
-            // HANDLE MOVEMENT //
+            /// HANDLE MOVEMENT ///
             handle_movement(dt);
 
-            // HANDLE DATA FROM SERVER //
+            /// HANDLE DATA FROM SERVER ///
             char *buffer = client_recv();
             if (buffer) {
                 parse_buffer(buffer);
                 free(buffer);
             }
 
-            // FLUSH DATABASE //
+            /// FLUSH DATABASE ///
             if (now - last_commit > COMMIT_INTERVAL) {
                 last_commit = now;
                 db_commit();
             }
 
-            // SEND POSITION TO SERVER //
+            /// SEND POSITION TO SERVER ///
             if (now - last_update > 0.1) {
                 last_update = now;
                 client_position(s->x, s->y, s->z, s->rx, s->ry);
             }
 
-            // PREPARE TO RENDER //
+            /// PREPARE TO RENDER ///
             g->observe1 = g->observe1 % g->player_count;
             g->observe2 = g->observe2 % g->player_count;
             delete_chunks();
@@ -3013,7 +3129,7 @@ int main(int argc, char **argv) {
             }
             Player *player = g->players + g->observe1;
 
-            // RENDER 3-D SCENE //
+            /// RENDER 3-D SCENE ///
             glClear(GL_COLOR_BUFFER_BIT);
             glClear(GL_DEPTH_BUFFER_BIT);
             render_sky(&sky_attrib, player, sky_buffer);
@@ -3026,7 +3142,7 @@ int main(int argc, char **argv) {
                 render_wireframe(&line_attrib, player);
             }
 
-            // RENDER HUD //
+            /// RENDER HUD ///
             glClear(GL_DEPTH_BUFFER_BIT);
             if (SHOW_CROSSHAIRS) {
                 render_crosshairs(&line_attrib);
@@ -3035,7 +3151,30 @@ int main(int argc, char **argv) {
                 render_item(&block_attrib);
             }
 
-            // RENDER TEXT //
+            /// Render Binoculars
+
+            /// If the player is holding down the zoom key (CRAFT_KEY_ZOOM),
+            /// render the binoculars effect to make it seem like they are looking through binoculars.            
+            if (glfwGetKey(g->window, CRAFT_KEY_ZOOM))
+            {
+                render_binoculars(&block_attrib);
+            }
+            
+            
+
+            /// Timer
+            /// Get the current time in seconds using the 'time' function from the standard library.
+            time_t _now = time(NULL);
+            /// Calculate the elapsed time since the timeout was set.
+            time_t elapsed = _now - g->start;
+            /// If the game has no timeout set (hasTimeout flag is false),
+            /// then the elapsed time is equal to the pre-set timeout value.
+            /// This ensures that the elapsed time remains constant when no timeout is used.
+            if (!g->hasTimeout)
+                elapsed = g->timeout;
+
+
+            /// RENDER TEXT ///
             char text_buffer[1024];
             float ts = 12 * g->scale;
             float tx = ts / 2;
@@ -3045,6 +3184,28 @@ int main(int argc, char **argv) {
                 char am_pm = hour < 12 ? 'a' : 'p';
                 hour = hour % 12;
                 hour = hour ? hour : 12;
+
+				///timer text
+                /// This code block handles the display of information when a timeout (timer) is set ('g->hasTimeout' is true).
+                if (g->hasTimeout)
+                {
+                    /// If a timeout (timer) is set, construct the text_buffer with information about the player's position,
+                    /// in-game time, frame rate (FPS), and the remaining time until the timeout (timer) expires.
+
+                    /// Use snprintf to format the information text and store it in 'text_buffer'.
+                    /// The information includes chunk coordinates, player coordinates, player and chunk counts,
+                    /// the double of the face count, in-game time in 12-hour format with AM/PM indication,
+                    /// the frame rate (FPS), and the remaining time until the timeout (timer) expires ('g->timeout - elapsed').
+
+                    snprintf(
+                        text_buffer, 1024,
+                        "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps Timeout %ld",
+                        chunked(s->x), chunked(s->z), s->x, s->y, s->z,
+                        g->player_count, g->chunk_count,
+                        face_count * 2, hour, am_pm, fps.fps, g->timeout - elapsed);
+                }
+                else
+                {
                 snprintf(
                     text_buffer, 1024,
                     "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
@@ -3082,7 +3243,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // RENDER PICTURE IN PICTURE //
+            /// RENDER PICTURE IN PICTURE ///
             if (g->observe2) {
                 player = g->players + g->observe2;
 
@@ -3117,10 +3278,16 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // SWAP AND POLL //
+            /// SWAP AND POLL ///
             glfwSwapBuffers(g->window);
             glfwPollEvents();
-            if (glfwWindowShouldClose(g->window)) {
+
+            /// If the window is closed manually by the user,
+            /// or if the elapsed time since the game started has exceeded the timeout (timer) value,
+            /// set 'running' to 0 to stop the game loop and exit the game.
+            /// This allows the game to close automatically when the timeout is reached.
+            /// The 'break' statement is used to exit the current loop immediately.
+                 if (glfwWindowShouldClose(g->window) || elapsed > g->timeout) { ///closes window when time runs out
                 running = 0;
                 break;
             }
@@ -3137,7 +3304,7 @@ int main(int argc, char **argv) {
             render_menu(&game_menu_attrib);
         }
 
-        // SHUTDOWN //
+        /// SHUTDOWN ///
         db_save_state(s->x, s->y, s->z, s->rx, s->ry);
         db_close();
         db_disable();
