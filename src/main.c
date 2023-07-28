@@ -3318,4 +3318,5 @@ int main(int argc, char **argv) {
     glfwTerminate();
     curl_global_cleanup();
     return 0;
+    }
 }
