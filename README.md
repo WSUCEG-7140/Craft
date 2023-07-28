@@ -6,10 +6,11 @@
 - Amaechi, Chikaosolu: https://github.com/camaechi
 
 ## Literate Programming
-- `main.c` has reference to https://github.com/WSUCEG-7140/Craft/issues/7 in a comment.
+- `src/main.c` has reference to https://github.com/WSUCEG-7140/Craft/issues/7 in a comment
 - 
 
 ## Programming by contract
+- `load_file` function in `src/util.c` has an example contract comment
 - 
 
 # Craft
