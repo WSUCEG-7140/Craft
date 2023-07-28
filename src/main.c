@@ -2091,6 +2091,7 @@ void parse_command(const char *buffer, int forward) {
         add_message("Successfully imported identity token!");
         login();
     }
+    // handles https://github.com/WSUCEG-7140/Craft/issues/7
     else if (sscanf(buffer, "/help %128s", help_target) == 1) {  ///this handles a help command with optional target
         ///basic if statement handling for each supported command
         if (strcmp(help_target, "goto") == 0) {

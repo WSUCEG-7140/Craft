@@ -6,6 +6,7 @@
 - Amaechi, Chikaosolu: https://github.com/camaechi
 
 ## Literate Programming
+- `main.c` has reference to https://github.com/WSUCEG-7140/Craft/issues/7 in a comment.
 - 
 
 ## Programming by contract
