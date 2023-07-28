@@ -1,4 +1,17 @@
-## Craft
+# CD-7140 Summer 2023 Team Project
+
+## Members
+- Mitchell, Anthony: https://github.com/TonePoems
+- Burdick, Derek: https://github.com/dburd08
+- Amaechi, Chikaosolu: https://github.com/camaechi
+
+## Literate Programming
+- 
+
+## Programming by contract
+- 
+
+# Craft
 
 Minecraft clone for Windows, Mac OS X and Linux. Just a few thousand lines of C using modern OpenGL (shaders). Online multiplayer support is included using a Python-based server.
 
