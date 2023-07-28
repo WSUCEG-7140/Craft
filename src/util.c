@@ -27,6 +27,13 @@ void update_fps(FPS *fps) {
     }
 }
 
+// Function Contract (not our function, just commented to show understanding)
+// Pre: A string (char array because C) filename to be read in.
+// Errors: If the requested file encounters an error in fopen (ex. not found), 
+//         the program will exit. This could also be seen as a side effect,
+//         because traditionally this should be handled by throwing back an error,
+//         not ending the program from within the called function.
+// Post: The data within the passed filepath will be returned as a string (char array).
 char *load_file(const char *path) {
     FILE *file = fopen(path, "rb");
     if (!file) {
