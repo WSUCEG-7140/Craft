@@ -3136,6 +3136,7 @@ int main(int argc, char **argv) {
                     face_count * 2, hour, am_pm, fps.fps);
                 render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
                 ty -= ts * 2;
+                }
             }
             if (SHOW_CHAT_TEXT) {
                 for (int i = 0; i < MAX_MESSAGES; i++) {
@@ -3209,7 +3210,7 @@ int main(int argc, char **argv) {
             /// set 'running' to 0 to stop the game loop and exit the game.
             /// This allows the game to close automatically when the timeout is reached.
             /// The 'break' statement is used to exit the current loop immediately.
-                 if (glfwWindowShouldClose(g->window) || elapsed > g->timeout) { ///closes window when time runs out
+            if (glfwWindowShouldClose(g->window) || elapsed > g->timeout) { ///closes window when time runs out
                 running = 0;
                 break;
             }
@@ -3233,4 +3234,5 @@ int main(int argc, char **argv) {
     glfwTerminate();
     curl_global_cleanup();
     return 0;
+    
 }
