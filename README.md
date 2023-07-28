@@ -266,3 +266,8 @@ http://0fps.wordpress.com/2013/07/03/ambient-occlusion-for-minecraft-like-worlds
 * lodepng is used for loading PNG textures.
 * sqlite3 is used for saving the blocks added / removed by the user.
 * tinycthread is used for cross-platform threading.
+
+
+#### Sources
+game menu texture sourced from 
+<a href="https://www.freepik.com/free-photo/black-chalkboard-background_16250935.htm#query=menu%20texture&position=7&from_view=keyword&track=ais">Image by rawpixel.com</a> on Freepik
