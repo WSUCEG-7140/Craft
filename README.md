@@ -7,7 +7,7 @@
 
 ## Literate Programming
 - `src/main.c` has reference to https://github.com/WSUCEG-7140/Craft/issues/7 in a comment
-- The demonstration of literate programming for issues https://github.com/WSUCEG-7140/Craft/issues/4, https://github.com/WSUCEG-7140/Craft/issues/13, https://github.com/WSUCEG-7140/Craft/issues/15, https://github.com/WSUCEG-7140/Craft/issues/16, https://github.com/WSUCEG-7140/Craft/issues/17, https://github.com/WSUCEG-7140/Craft/issues/18 can be found in Pull Request #67. Please refer to that PR for detailed examples and explanations
+- The demonstration of literate programming for issues https://github.com/WSUCEG-7140/Craft/issues/4, https://github.com/WSUCEG-7140/Craft/issues/13, https://github.com/WSUCEG-7140/Craft/issues/15, https://github.com/WSUCEG-7140/Craft/issues/16, https://github.com/WSUCEG-7140/Craft/issues/17, https://github.com/WSUCEG-7140/Craft/issues/18 can be found in Pull Request https://github.com/WSUCEG-7140/Craft/pull/67. Please refer to that PR for detailed examples and explanations
   
 ## Programming by contract
 - `load_file` function in `src/util.c` has an example contract comment
