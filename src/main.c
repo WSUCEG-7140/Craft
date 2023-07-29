@@ -156,7 +156,7 @@ typedef struct {
     Block block1;
     Block copy0;
     Block copy1;
-    GLuint menu_buffer; // menu buffer needs to persist in the window object? 
+    Attrib* game_menu_attrib; //stores rendering/shader info for game menu
     int p_height; /// Height of the player in the game world
     long timeout; /// Timeout value used for the timer feature for issue #17
     bool hasTimeout;  /// Flag indicating if the timer feature has been set
@@ -165,7 +165,7 @@ typedef struct {
 
 static Model model;
 static Model *g = &model;
-int TOGGLE_MENU = 0;
+bool TOGGLE_MENU = false;
 
 int chunked(float x) {
     return floorf(roundf(x) / CHUNK_SIZE);
@@ -306,17 +306,20 @@ GLuint gen_text_buffer(float x, float y, float n, char *text) {
 
 /** 
  * buffer for game menu data
+ * not sure how to determine buffer size or which existing buffer is best 
+ * suited for an in game menu. 
+ * crosshair feels most like what the menu would be
 */
 GLuint gen_menu_buffer(){
     printf("inside gen_menu_buffer");
-    int x = g->width /2;
-    int y = g->height  /2;
+    int x = g->width / 2;
+    int y = g->height / 2;
     int p = 10 * g->scale;
     float data[] = {
         x, y - p, x, y + p,
         x - p, y, x + p, y
     };
-    return gen_buffer(sizeof(data),data);
+    return gen_buffer(sizeof(data), data);
 }
 
 GLuint gen_plane_buffer(float x, float y, float n) {
@@ -447,8 +450,8 @@ void draw_player(Attrib *attrib, Player *player) {
  * method to draw the game menu
 */
 void draw_menu(Attrib *attrib, GLuint buffer){
-    printf("in draw_menu");
-    draw_triangles_3d_ao(attrib, buffer, 16);
+    printf("in draw_menu \n");
+    draw_triangles_2d(attrib, buffer, 131072);
 }
 
 Player *find_player(int id) {
@@ -1890,14 +1893,17 @@ void render_text(
  * issue19 https://github.com/WSUCEG-7140/Craft/issues/19
 */
 void render_menu(Attrib *attrib){
-    printf("inside render_menu");
-    float matrix[16];
-    set_matrix_item(matrix, g->width, g->height, g->scale);
+    printf("inside render_menu \n");
+    //menu is 512x256 px 
+    float matrix[512*256];
+    set_matrix_2d(matrix, g->width, g->height);
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniform1i(attrib->sampler, 0);
     GLuint buffer = gen_menu_buffer();
     draw_menu(attrib, buffer);
     del_buffer(buffer);
+
 }
 void add_message(const char *text) {
     printf("%s\n", text);
@@ -2401,14 +2407,17 @@ void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
     }
     // toggle the game menu on key press
     // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
-    if (key == CRAFT_KEY_MENU){
-        printf("p was pressed");
-        if(TOGGLE_MENU == 0){
-            TOGGLE_MENU == 1;
-        }else{
-            TOGGLE_MENU == 0;
-        }
-    
+    if (key == GLFW_KEY_P){
+        // printf("p was pressed \n");
+        // if(TOGGLE_MENU == false){
+        //     printf("true \n");
+        //     TOGGLE_MENU == true;
+        // }else{
+        //     printf("false \n");
+        //     TOGGLE_MENU == false;
+        // }
+        render_menu(g->game_menu_attrib);
+
     }
 
     if (key == GLFW_KEY_ENTER) {
@@ -2998,7 +3007,9 @@ int main(int argc, char **argv) {
     game_menu_attrib.position = glGetAttribLocation(program, "position");
     game_menu_attrib.normal = glGetAttribLocation(program, "normal");
     game_menu_attrib.matrix = glGetUniformLocation(program, "matrix");
-
+    game_menu_attrib.uv = glGetAttribLocation(program, "uv");
+    game_menu_attrib.sampler = glGetUniformLocation(program, "sampler");
+    printf("menu shaders loaded \n");
     /// CHECK COMMAND LINE ARGUMENTS ///
     if (argc == 2 || argc == 3) {
         g->mode = MODE_ONLINE;
@@ -3011,7 +3022,8 @@ int main(int argc, char **argv) {
         g->mode = MODE_OFFLINE;
         snprintf(g->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
     }
-
+    // setting pointer to game_menu_attrib holding game menu shader info
+    g->game_menu_attrib = &game_menu_attrib;
     g->create_radius = CREATE_CHUNK_RADIUS;
     g->render_radius = RENDER_CHUNK_RADIUS;
     g->delete_radius = DELETE_CHUNK_RADIUS;
@@ -3075,6 +3087,8 @@ int main(int argc, char **argv) {
         /// BEGIN MAIN LOOP ///
         double previous = glfwGetTime();
         while (1) {
+            // printf("toggle menu is:");
+            // printf("%d\n", TOGGLE_MENU);
             /// WINDOW SIZE AND SCALE ///
             g->scale = get_scale_factor();
             glfwGetFramebufferSize(g->window, &g->width, &g->height);
@@ -3160,7 +3174,15 @@ int main(int argc, char **argv) {
             {
                 render_binoculars(&block_attrib);
             }
-            
+            // RENDER GAME MENU //
+            // when pause button is pressed, toggle menu is set to true, rendering the game menu
+            // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
+            // if(glfwGetKey(g->window, CRAFT_KEY_MENU)){
+            //     if(TOGGLE_MENU){
+            //         render_menu(&game_menu_attrib);
+            //     }
+                
+            // }
             
 
             /// Timer
@@ -3298,13 +3320,7 @@ int main(int argc, char **argv) {
                 break;
             }
         }
-        // RENDER GAME MENU //
-        // when pause button is pressed, toggle menu is set to true, rendering the game menu
-        // issue19 https://github.com/WSUCEG-7140/Craft/issues/19
-        if(TOGGLE_MENU){
-            printf("main loop MENU toggled");
-            render_menu(&game_menu_attrib);
-        }
+        
 
         /// SHUTDOWN ///
         db_save_state(s->x, s->y, s->z, s->rx, s->ry);

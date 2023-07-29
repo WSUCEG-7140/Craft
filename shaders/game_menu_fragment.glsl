@@ -1,5 +1,10 @@
 #version 120
 
+uniform sampler2D sampler;
+varying vec2 fragment_uv;
+
 void main() {
-  gl_FragColor = vec4(0.0, 0.58, 0.86, 1.0);
+  // using sample to get color from texture file
+  vec4 color = texture2D(sampler, fragment_uv);
+  gl_FragColor = color;
 }
