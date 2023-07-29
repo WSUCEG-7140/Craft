@@ -11,8 +11,8 @@
   
 ## Programming by contract
 - `load_file` function in `src/util.c` has an example contract comment
-- 
-
+- The demonstration of programming by contract for issues https://github.com/WSUCEG-7140/Craft/issues/4, https://github.com/WSUCEG-7140/Craft/issues/13, https://github.com/WSUCEG-7140/Craft/issues/15, https://github.com/WSUCEG-7140/Craft/issues/16, https://github.com/WSUCEG-7140/Craft/issues/17 can be found in Pull Request https://github.com/WSUCEG-7140/Craft/pull/68. Please refer to that PR for detailed examples and explanations
+  
 # Craft
 
 Minecraft clone for Windows, Mac OS X and Linux. Just a few thousand lines of C using modern OpenGL (shaders). Online multiplayer support is included using a Python-based server.
