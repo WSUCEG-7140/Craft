@@ -1,6 +1,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <curl/curl.h>
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -303,10 +304,26 @@ GLuint gen_text_buffer(float x, float y, float n, char *text) {
     return gen_faces(4, length, data);
 }
 
+/// Contract: The 'x' and 'y' parameters should be valid floating-point values.
+/// Contract: The 'n' parameter should be a valid floating-point value greater than zero.
+/// Contract: The returned value (GLuint) should be a valid buffer object identifier (GLuint).
 GLuint gen_plane_buffer(float x, float y, float n) {
+    /// Precondition: 'n' should be greater than zero to avoid division by zero later.
+    assert(n > 0.0);
+
     int length = 100;
-    GLfloat *data = malloc_faces(4, length);     
-    return gen_faces(4, length, data);
+    /// Contract: The 'data' pointer should not be NULL, and it should point to a valid memory block.
+    assert(data != NULL);
+
+    GLfloat *data = malloc_faces(4, length); // The 'malloc_faces' function is not shown here.
+
+    /// Contract: The returned value (GLuint) should be a valid buffer object identifier (GLuint).
+    GLuint buffer = gen_faces(4, length, data); // The 'gen_faces' function is not shown here.
+
+    /// Contract: The 'buffer' should be a valid buffer object identifier (GLuint).
+    assert(buffer != 0);
+
+    return buffer;
     /// The function returns the buffer object identifier (GLuint) created by 'gen_faces' function.
     ///'4': This represents the number of vertices per face of the plane (a quad).
     ///'length': The number of vertices calculated earlier (100 in this case).
@@ -1804,17 +1821,29 @@ void render_item(Attrib *attrib) {
     }
 }
 
+/// Contract: 'attrib' should be a valid pointer to an 'Attrib' structure.
+/// Contract: The 'Attrib' structure should hold valid attributes and settings related to OpenGL rendering.
 void render_binoculars(Attrib *attrib) ///Creates Binoculars
 /// This function is used to render a binoculars effect using OpenGL.
 /// It takes a pointer to an 'Attrib' structure as an argument, which holds
 /// various attributes and settings related to OpenGL rendering.
+
+/// Precondition: Check if 'attrib' is not NULL.
+    assert(attrib != NULL);
+
 {
     float matrix[16];
     /// Declare an array 'matrix' of size 16 to store a 4x4 transformation matrix.
     /// This matrix will be used to perform transformations in the OpenGL rendering pipeline.
-    set_matrix_item(matrix, g->width, g->height, g->scale*20);
+
+    /// Contract: 'matrix' should be a valid 4x4 transformation matrix.
+    /// Contract: The 'set_matrix_item' function should correctly populate the 'matrix'.
+    set_matrix_item(matrix, g->width, g->height, g->scale * 20);
     /// Set the values of the 'matrix' based on the width, height, and scale of the binoculars.
     /// The 'set_matrix_item' function populates the 'matrix' with appropriate values.
+
+    /// Contract: 'attrib->program' should be a valid OpenGL shader program identifier.
+    assert(attrib->program != 0);
     
     glUseProgram(attrib->program);
     /// Activate the OpenGL shader program specified in the 'program' attribute of the 'attrib' structure.
@@ -1822,27 +1851,55 @@ void render_binoculars(Attrib *attrib) ///Creates Binoculars
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     /// Set the value of the matrix uniform variable in the shader program with the 'matrix' data.
     /// The matrix is passed as a 4x4 floating-point matrix (GL_FALSE indicates no transpose).
+
+    /// Contract: 'attrib->matrix' should be a valid uniform location for the 4x4 matrix in the shader program.
+    assert(attrib->matrix != -1);
+
     glUniform3f(attrib->camera, 0, 0, 5);
     /// Set the value of the 'camera' uniform variable in the shader program to (0, 0, 5).
     /// This defines the position of the camera used in the rendering.
+
+    /// Contract: 'attrib->camera' should be a valid uniform location for the camera position vector in the shader program.
+    assert(attrib->camera != -1);
+
+
     glUniform1i(attrib->sampler, 0);
     /// Set the value of the 'sampler' uniform variable in the shader program to 0.
     /// This indicates that the shader will use texture unit 0 for texturing.
+
+    /// Contract: 'attrib->sampler' should be a valid uniform location for the texture sampler in the shader program.
+    assert(attrib->sampler != -1);
+
     glUniform1f(attrib->timer, time_of_day());
     /// Set the value of the 'timer' uniform variable in the shader program to the current in-game time.
     /// The 'time_of_day()' function returns the current time in the game.
+
+    /// Contract: 'attrib->timer' should be a valid uniform location for the timer value in the shader program.
+    assert(attrib->timer != -1);
+
+
     int w = 23; 
+     /// Contract: 'w' should be a valid integer value
     /// Declare an integer variable 'w' and set it to 23. This variable represents the width value.
+    /// Contract: The 'gen_plant_buffer' function should generate valid vertex data for the binocular and return a valid buffer object identifier.
     GLuint buffer = gen_plant_buffer(-0.9, -.4, 0, 0.5, w);
     /// Generate a buffer object for the binocular model based on the provided parameters.
     /// The 'gen_plant_buffer' function generates the vertex data for the binocular and returns a buffer object.
+
+        /// Contract: The 'draw_plant' function should correctly render the binocular model using the provided 'attrib' and 'buffer' arguments.
         draw_plant(attrib, buffer);
         /// Render the binocular model using the 'draw_plant' function.
         /// The 'attrib' argument provides the necessary attributes and settings for the rendering.
 
+    /// Contract: The 'buffer' should be a valid buffer object identifier.
+    assert(buffer != 0);
+
+    /// Contract: The 'del_buffer' function should delete the buffer object correctly.
         del_buffer(buffer);
         /// Delete the buffer object as it is no longer needed. This is done to free up GPU memory.
         /// The 'del_buffer' function takes the buffer object identifier as an argument and deletes it.
+
+        /// Postcondition: The function should perform rendering without errors and free up GPU memory.
 }
 void render_text(
     Attrib *attrib, int justify, float x, float y, float n, char *text)
@@ -2261,7 +2318,20 @@ void parse_command(const char *buffer, int forward) {
         cylinder(&g->block0, &g->block1, radius, 0);
     }
     /// Check if the command is "/addtime" followed by an integer count value.
+    /// Contract: The 'count' variable must be a positive value greater than zero.
+    /// Precondition: count must be greater than zero.
+    assert(count > 0);
     else if (sscanf(buffer, "/addtime %d", &count) == 1) {
+    /// Contract: The 'buffer' should be correctly formatted and contain a valid integer value after "/addtime" command.
+    /// If the condition is false, it indicates that the input buffer is not correctly formatted, which is a violation of the contract.
+    /// Precondition: The input buffer must be correctly formatted and contain a valid integer value after "/addtime" command.
+    assert(sscanf(buffer, "/addtime %d", &count) == 1);
+
+    /// Contract: The 'count' value must be a positive value greater than zero.
+    /// If the condition is false, it indicates that the provided count value is not valid, violating the contract.
+    /// Precondition: count must be greater than zero.
+    assert(count > 0);
+
          /// Set a timeout value with the desired duration in seconds for your gameplay session
         /// This is used for the timer functionality.
         g->start = time(NULL);
@@ -2326,9 +2396,23 @@ void on_middle_click() {
 }
 
 void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    /// Precondition: The 'window' parameter should not be NULL.
+    assert(window != NULL);
+
+    /// Precondition: The 'key' parameter should be a valid key value recognized by GLFW.
+    assert(key >= 0);
+
+    /// Precondition: The 'scancode' parameter should be a valid scancode value recognized by GLFW.
+    assert(scancode >= 0);
+
+    /// Precondition: The 'action' parameter should be a valid action value recognized by GLFW.
+    assert(action >= 0 && action <= GLFW_REPEAT);
+
+    /// Precondition: The 'mods' parameter should be a valid set of modifier bits recognized by GLFW.
+    assert(mods >= 0);
+
     int control = mods & (GLFW_MOD_CONTROL | GLFW_MOD_SUPER);
-    int exclusive =
-        glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+    int exclusive = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
     if (action == GLFW_RELEASE) {
         return;
     }
@@ -2428,6 +2512,9 @@ void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
     ///This function is used to lower the height of the camera
     /// Check if the key pressed is the comma key (',').
     {
+        /// Precondition: The 'g' pointer should not be NULL.
+        assert(g != NULL);
+
         /// Check if the player's height (p_height) is greater than 2.
         /// This ensures that the camera height is not reduced below a minimum limit. Anything lower than 2 and the player gets stuck in the blocks.
         if (g->p_height > 2)
@@ -2439,8 +2526,13 @@ void on_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
     /// Check if the key pressed is the period key ('.').
     /// This function is used to raise the height of the camera.
     {
+        /// Precondition: The 'g' pointer should not be NULL.
+        assert(g != NULL);
         /// Get a reference to the player's state (position and orientation) in the game (State struct).
         ///Here we access the first player's state.
+         /// Precondition: The 'g->players' pointer should not be NULL, and it should point to a valid 'Players' struct.
+        assert(g->players != NULL);
+
         State *s = &g->players->state;
         /// Increase the y-coordinate (vertical height) of the player's state by 1 unit.
         /// This moves the player upward in the game.
@@ -2585,7 +2677,10 @@ void handle_mouse_input() {
     }
 }
 
+/// Precondition: The 'dt' parameter should be a positive value (non-negative).
+/// It represents the time elapsed since the last call to 'handle_movement'.
 void handle_movement(double dt) {
+        assert(dt >= 0);
     static float dy = 0;
     State *s = &g->players->state;
     int sz = 0;
@@ -2593,6 +2688,8 @@ void handle_movement(double dt) {
     int isRunning = 0; /// Variable to store the running state, initially set to 0 (not running).
     if (!g->typing) {
         float m = dt * 1.0;
+        /// Precondition: The 'window' parameter in 'glfwGetKey' should not be NULL.
+        assert(g->window != NULL); ///Please note that the assert statements are used to check preconditions and postconditions
         g->ortho = glfwGetKey(g->window, CRAFT_KEY_ORTHO) ? 64 : 0;
         g->fov = glfwGetKey(g->window, CRAFT_KEY_ZOOM) ? 15 : 65;
 
@@ -2602,6 +2699,10 @@ void handle_movement(double dt) {
             if(glfwGetKey(g->window, CRAFT_KEY_RUN)) isRunning = 1;
             sz--;
         } 
+        /// Postcondition: Ensure that the 'isRunning' variable is correctly updated when the running key is pressed.
+        /// Postcondition: Ensure that the 'g->ortho' and 'g->fov' variables are updated correctly
+        /// based on the state of corresponding keys.
+
         if (glfwGetKey(g->window, CRAFT_KEY_BACKWARD)) sz++;
         if (glfwGetKey(g->window, CRAFT_KEY_LEFT)) sx--;
         if (glfwGetKey(g->window, CRAFT_KEY_RIGHT)) sx++;
@@ -2629,16 +2730,44 @@ void handle_movement(double dt) {
     /// This line presumably enhances the player's movement speed when running.
     /// The value of "speed" should be a variable that controls the player's movement speed in the game.
     /// The multiplication by 1.5 boosts the speed to create a faster movement effect while running.
-    if(isRunning) speed*=1.5;
+
+/// Precondition: The 'speed' parameter should be a non-negative value.
+/// It represents the player's movement speed.
+/// Precondition: The 'dt' parameter should be a positive value (non-negative).
+/// It represents the time elapsed since the last update.
+void handle_movement(double dt, float speed) {
+    assert(speed >= 0);
+    assert(dt >= 0);
+
+    if (isRunning) {
+        /// Postcondition: If 'isRunning' is true, the 'speed' variable is multiplied by 1.5.
+        speed *= 1.5;
+    }
+
     int estimate = roundf(sqrtf(
         powf(vx * speed, 2) +
         powf(vy * speed + ABS(dy) * 2, 2) +
         powf(vz * speed, 2)) * dt * 8);
+    
+    /// Postcondition: The 'estimate' variable should be a positive or zero integer.
+    assert(estimate >= 0);
+
     int step = MAX(8, estimate);
+    
+    /// Postcondition: The 'step' variable should be a positive integer.
+    assert(step > 0);
+
     float ut = dt / step;
+
+    /// Postcondition: The 'ut' variable should be a positive value (non-negative).
+    assert(ut >= 0);
+
     vx = vx * ut * speed;
     vy = vy * ut * speed;
     vz = vz * ut * speed;
+
+    /// Postcondition: The 'vx', 'vy', and 'vz' variables should be updated based on the calculations.
+}
     for (int i = 0; i < step; i++) {
         if (g->flying) {
             dy = 0;
@@ -2781,9 +2910,24 @@ void reset_model() {
     g->message_index = 0;
     g->day_length = DAY_LENGTH;
     glfwSetTime(g->day_length / 3.0);
+
+    /// Contract: The 'time_changed' flag must be set to true after calling this function.
+    /// Postcondition: The time_changed flag must be set to 1 (true).
+    assert(g->time_changed == 1);
+
     g->time_changed = 1;
+
+    /// Contract: The player's height (p_height) must be set to 2 units after calling this function.
+    /// Postcondition: The player's height (p_height) must be 2 units.
+    assert(g->p_height == 2);
+
     /// Set the player's height (camera height) to 2 units.
      g->p_height = 2;
+
+    /// Contract: The timeout value must be set to zero after calling this function, indicating that no timer is currently set.
+    /// Postcondition: The timeout value must be zero.
+    assert(g->timeout == 0);
+
      /// Set the timeout value to zero, indicating that no timer is currently set.
     g->timeout = 0;
 }
@@ -2895,20 +3039,58 @@ int main(int argc, char **argv) {
     text_attrib.sampler = glGetUniformLocation(program, "sampler");
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
 
-    program = load_program(
-        "shaders/block_vertex.glsl", "shaders/block_fragment.glsl");        
-    binoculars_attrib.program = program;
-    binoculars_attrib.position = glGetAttribLocation(program, "position");
-    binoculars_attrib.normal = glGetAttribLocation(program, "normal");
-    binoculars_attrib.uv = glGetAttribLocation(program, "uv");
-    binoculars_attrib.matrix = glGetUniformLocation(program, "matrix");
-    binoculars_attrib.sampler = glGetUniformLocation(program, "sampler");
-    binoculars_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
-    binoculars_attrib.extra2 = glGetUniformLocation(program, "daylight");
-    binoculars_attrib.extra3 = glGetUniformLocation(program, "fog_distance");
-    binoculars_attrib.extra4 = glGetUniformLocation(program, "ortho");
-    binoculars_attrib.camera = glGetUniformLocation(program, "camera");
-    binoculars_attrib.timer = glGetUniformLocation(program, "timer");
+GLuint program = load_program(
+    "shaders/block_vertex.glsl", "shaders/block_fragment.glsl");
+/// Contract: The 'load_program' function should return a valid OpenGL shader program identifier.
+assert(program != 0);
+
+binoculars_attrib.program = program;
+
+/// Contract: The 'glGetAttribLocation' function should return a valid attribute location for "position" in the shader program.
+binoculars_attrib.position = glGetAttribLocation(program, "position");
+assert(binoculars_attrib.position != -1);
+
+/// Contract: The 'glGetAttribLocation' function should return a valid attribute location for "normal" in the shader program.
+binoculars_attrib.normal = glGetAttribLocation(program, "normal");
+assert(binoculars_attrib.normal != -1);
+
+/// Contract: The 'glGetAttribLocation' function should return a valid attribute location for "uv" in the shader program.
+binoculars_attrib.uv = glGetAttribLocation(program, "uv");
+assert(binoculars_attrib.uv != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "matrix" in the shader program.
+binoculars_attrib.matrix = glGetUniformLocation(program, "matrix");
+assert(binoculars_attrib.matrix != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "sampler" in the shader program.
+binoculars_attrib.sampler = glGetUniformLocation(program, "sampler");
+assert(binoculars_attrib.sampler != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "sky_sampler" in the shader program.
+binoculars_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
+assert(binoculars_attrib.extra1 != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "daylight" in the shader program.
+binoculars_attrib.extra2 = glGetUniformLocation(program, "daylight");
+assert(binoculars_attrib.extra2 != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "fog_distance" in the shader program.
+binoculars_attrib.extra3 = glGetUniformLocation(program, "fog_distance");
+assert(binoculars_attrib.extra3 != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "ortho" in the shader program.
+binoculars_attrib.extra4 = glGetUniformLocation(program, "ortho");
+assert(binoculars_attrib.extra4 != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "camera" in the shader program.
+binoculars_attrib.camera = glGetUniformLocation(program, "camera");
+assert(binoculars_attrib.camera != -1);
+
+/// Contract: The 'glGetUniformLocation' function should return a valid uniform location for "timer" in the shader program.
+binoculars_attrib.timer = glGetUniformLocation(program, "timer");
+assert(binoculars_attrib.timer != -1);
+
+/// Postcondition: The 'binoculars_attrib' structure should be correctly initialized with valid attribute and uniform locations.
 
     program = load_program(
         "shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
@@ -3075,25 +3257,48 @@ int main(int argc, char **argv) {
 
             /// Render Binoculars
 
+            /// Precondition: The 'g' pointer and 'g->window' pointer must not be NULL.
+                assert(g != NULL);
+                assert(g->window != NULL);
+
             /// If the player is holding down the zoom key (CRAFT_KEY_ZOOM),
             /// render the binoculars effect to make it seem like they are looking through binoculars.            
-            if (glfwGetKey(g->window, CRAFT_KEY_ZOOM))
-            {
-                render_binoculars(&block_attrib);
+            if (glfwGetKey(g->window, CRAFT_KEY_ZOOM)) {
+            /// Contract: The 'render_binoculars' function expects a valid 'Attrib' pointer as an argument.
+            /// Precondition: The 'block_attrib' pointer must not be NULL.
+            assert(&block_attrib != NULL);
+
+            render_binoculars(&block_attrib);
             }
             
-            
+            /// Contract: The 'g' pointer must point to a valid memory location (non-null).
+            /// Precondition: g must not be a null pointer.
+            assert(g != NULL);
+
+            /// Contract: The 'start' value must be a valid timestamp (greater than or equal to zero).
+            /// Precondition: g->start must be greater than or equal to zero.
+            assert(g->start >= 0);
+
+            /// Contract: The 'timeout' value must be a valid timeout duration (greater than or equal to zero).
+            /// Precondition: g->timeout must be greater than or equal to zero.
+            assert(g->timeout >= 0);
 
             /// Timer
             /// Get the current time in seconds using the 'time' function from the standard library.
+            /// Contract: The '_now' variable must be set to the current time in seconds using the 'time' function from the standard library.
+            /// Postcondition: _now must contain the current time in seconds.
             time_t _now = time(NULL);
             /// Calculate the elapsed time since the timeout was set.
+            /// Contract: The 'elapsed' variable must be calculated as the difference between the current time and 'g->start'.
+            /// Postcondition: elapsed must contain the calculated elapsed time in seconds.
             time_t elapsed = _now - g->start;
-            /// If the game has no timeout set (hasTimeout flag is false),
+            /// Contract: If the game has no timeout set (hasTimeout flag is false),
             /// then the elapsed time is equal to the pre-set timeout value.
             /// This ensures that the elapsed time remains constant when no timeout is used.
-            if (!g->hasTimeout)
-                elapsed = g->timeout;
+            /// Postcondition: If g->hasTimeout is false, then elapsed must be equal to g->timeout.
+            if (!g->hasTimeout) {
+              assert(elapsed = g->timeout);
+            }
 
 
             /// RENDER TEXT ///
