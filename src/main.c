@@ -2316,11 +2316,12 @@ void parse_command(const char *buffer, int forward) {
     }
     else if (sscanf(buffer, "/cylinder %d", &radius) == 1) {
         cylinder(&g->block0, &g->block1, radius, 0);
-    }
+    
     /// Check if the command is "/addtime" followed by an integer count value.
     /// Contract: The 'count' variable must be a positive value greater than zero.
     /// Precondition: count must be greater than zero.
     assert(count > 0);
+    }
     else if (sscanf(buffer, "/addtime %d", &count) == 1) {
     /// Contract: The 'buffer' should be correctly formatted and contain a valid integer value after "/addtime" command.
     /// If the condition is false, it indicates that the input buffer is not correctly formatted, which is a violation of the contract.

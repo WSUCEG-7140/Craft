@@ -186,7 +186,13 @@ int char_width(char input) {
     };
     return lookup[input];
 }
-
+/**
+ * This is an existing method being modified to show programming by 
+ * contract paradigm 
+ *
+ * @pre A string (or char array) that you want to find the length of
+ * @post the length of the string will be returned 
+ */
 int string_width(const char *input) {
     int result = 0;
     int length = strlen(input);
